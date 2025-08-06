@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calculator</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:400px;margin:40px auto;}
+    .calc-grid button{padding:20px;font-size:1.2rem;border:none;border-radius:10px;background:var(--info);color:#fff;}
+    .calc-grid button.operator{background:#0d1117;color:#c9d1d9;border:1px solid var(--line);}
+    #display{grid-column:span 4;padding:10px;background:#0d1117;border:1px solid var(--line);border-radius:10px;font-size:1.5rem;text-align:right;color:var(--text);}
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/">Home</a>
+    <a href="/exam.html">Exam tester</a>
+    <a href="/calculator.html">Calculator</a>
+  </nav>
+  <div class="container">
+    <div class="calc-grid">
+      <input id="display" disabled>
+      <button data-value="7">7</button>
+      <button data-value="8">8</button>
+      <button data-value="9">9</button>
+      <button data-value="/" class="operator">÷</button>
+      <button data-value="4">4</button>
+      <button data-value="5">5</button>
+      <button data-value="6">6</button>
+      <button data-value="*" class="operator">×</button>
+      <button data-value="1">1</button>
+      <button data-value="2">2</button>
+      <button data-value="3">3</button>
+      <button data-value="-" class="operator">−</button>
+      <button data-value="0">0</button>
+      <button data-value=".">.</button>
+      <button data-value="C" class="operator">C</button>
+      <button data-value="+" class="operator">+</button>
+      <button data-value="=" class="operator" style="grid-column:span 4;background:var(--ok);">=</button>
+    </div>
+  </div>
+  <script>
+    const display = document.getElementById('display');
+    document.querySelectorAll('.calc-grid button').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const v = btn.dataset.value;
+        if(v==='C'){display.value='';}
+        else if(v==='='){
+          try{display.value=eval(display.value)||'';}catch(e){display.value='Err';}
+        }else{
+          display.value+=v;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

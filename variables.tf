@@ -22,6 +22,12 @@ variable "cf_price_class" {
   default     = "PriceClass_100" # cheapest: NA+EU
 }
 
+variable "domain_name" {
+  description = "Custom domain for the CloudFront distribution"
+  type        = string
+  default     = null
+}
+
 variable "api_stage_name" {
   description = "HTTP API stage name"
   type        = string
