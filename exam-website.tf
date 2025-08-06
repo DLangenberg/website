@@ -142,7 +142,7 @@ resource "aws_cloudfront_distribution" "cdn" {
 
 # DNS records for the custom domain
 resource "aws_route53_record" "root" {
-  count  = var.domain_name == null ? 0 : 1
+  count   = var.domain_name == null ? 0 : 1
   zone_id = aws_route53_zone.primary[0].zone_id
   name    = var.domain_name
   type    = "A"
@@ -154,7 +154,7 @@ resource "aws_route53_record" "root" {
 }
 
 resource "aws_route53_record" "root_ipv6" {
-  count  = var.domain_name == null ? 0 : 1
+  count   = var.domain_name == null ? 0 : 1
   zone_id = aws_route53_zone.primary[0].zone_id
   name    = var.domain_name
   type    = "AAAA"
@@ -166,7 +166,7 @@ resource "aws_route53_record" "root_ipv6" {
 }
 
 resource "aws_route53domains_registered_domain" "domain" {
-  count      = var.domain_name == null ? 0 : 1
+  count       = var.domain_name == null ? 0 : 1
   domain_name = var.domain_name
   name_server {
     name = aws_route53_zone.primary[0].name_servers[0]
@@ -370,7 +370,7 @@ resource "aws_apigatewayv2_api" "http" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_headers = ["*"]
+    allow_headers = ["https://${var.domain_name}"]
     allow_methods = ["GET", "PUT", "OPTIONS"]
     allow_origins = ["*"]
   }

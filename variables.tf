@@ -25,7 +25,7 @@ variable "cf_price_class" {
 variable "domain_name" {
   description = "Custom domain for the CloudFront distribution"
   type        = string
-  default     = null
+  default     = "langenberg-aws.nl"
 }
 
 variable "api_stage_name" {
