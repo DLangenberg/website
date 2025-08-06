@@ -1,0 +1,50 @@
+# --- Terraform local caches & state ---
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Keep the dependency lock file (important for repeatable builds)
+!.terraform.lock.hcl
+
+# Local overrides (should not be committed)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Secrets / local vars
+*.tfvars
+*.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+
+# CLI config files (user-specific)
+.terraformrc
+terraform.rc
+
+# --- Lambda / build artifacts ---
+# zips produced by archive_file or local packaging
+**/lambda/*.zip
+**/*.zip
+
+# Node build noise (if you ever add a build step)
+**/node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-lock.yaml
+package-lock.json
+
+# --- Site build output (if you generate a build folder) ---
+# Uncomment/adjust if you generate a build dir
+# /site/dist/
+# /build/
+
+# --- OS / IDE noise ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+**/.terraform/*

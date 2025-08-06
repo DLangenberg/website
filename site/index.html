@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz App — Player & Admin</title>
+  <style>
+    :root{
+      --bg:#0b0f14;--panel:#121821;--muted:#8a99ad;--text:#e6edf3;--line:#1f2937;
+      --ok:#2ea043;--bad:#d73a49;--info:#1f6feb
+    }
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1200px 800px at 10% -10%,#101623 0,var(--bg) 50%);color:var(--text)}
+    .container{max-width:1000px;margin:0 auto;padding:24px 16px 64px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+    .brand{font-weight:800}
+    .tabs{display:flex;gap:8px}
+    .tab{background:#0d1117;border:1px solid var(--line);color:#c9d1d9;padding:6px 12px;border-radius:10px;cursor:pointer;transition:all .15s ease}
+    .tab.active{background:#1f6feb;color:white;border-color:#285ea8}
+    .pill{color:#c9d1d9;background:#0d1117;border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+    .card{background:linear-gradient(180deg,#121821,#0f141c);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.3);padding:20px;margin-top:10px}
+    .row{display:flex;gap:12px;align-items:center}
+    .muted{color:var(--muted)}
+    button{background:var(--info);color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button.secondary{background:#0d1117;color:#c9d1d9;border:1px solid #30363d}
+    button.ghost{background:transparent;color:var(--muted);border:1px dashed #2a3340}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    input,select,textarea{background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:1rem}
+    textarea{width:100%;min-height:200px}
+    .grid{display:grid;gap:12px}
+    .grid.cols-2{grid-template-columns:1fr 1fr}
+    .section-title{margin:0 0 8px 0;font-weight:700}
+    .progress{height:8px;background:#0d1117;border-radius:999px;overflow:hidden}
+    .progress>div{height:100%;background:linear-gradient(90deg,#238636,#2ea043);width:0%}
+
+    /* Player results (color-only) */
+    .results{display:grid;gap:14px;margin-top:18px}
+    .result-item{border:1px solid var(--line);background:#0d1117;border-radius:12px;padding:12px}
+    .result-item.okItem{border-color:rgba(46,160,67,.55);background:linear-gradient(180deg,rgba(46,160,67,.12),rgba(13,17,23,.7))}
+    .result-item.badItem{border-color:rgba(215,58,73,.55);background:linear-gradient(180deg,rgba(215,58,73,.12),rgba(13,17,23,.7))}
+    .picks{display:grid;gap:8px;margin-top:8px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+    .chip{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:8px 10px;line-height:1.3}
+    .chip.sel-ok{background:rgba(46,160,67,.18);border-color:rgba(46,160,67,.6)}
+    .chip.sel-bad{background:rgba(215,58,73,.18);border-color:rgba(215,58,73,.6)}
+    .chip.missed-ok{background:transparent;border-color:rgba(46,160,67,.6)}
+
+    .quiz-controls{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:12px}
+    .notice{margin-top:8px;color:var(--muted)} .err{color:var(--bad)}
+
+    /* Welcome overlay */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:10}
+    .overlay .sheet{background:#0d1117;border:1px solid var(--line);border-radius:16px;max-width:520px;width:92%;padding:20px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">⚡ Quiz App</div>
+      <div class="tabs">
+        <button id="tabPlayer" class="tab active">Take exam</button>
+        <button id="tabAdmin" class="tab">Admin</button>
+      </div>
+      <div id="scorePill" class="pill">Score: —</div>
+    </header>
+
+    <div id="playerCard" class="card" aria-live="polite"></div>
+    <div id="adminCard" class="card" aria-live="polite" style="display:none"></div>
+  </div>
+
+  <!-- Name gate overlay -->
+  <div id="nameGate" class="overlay" style="display:none">
+    <div class="sheet">
+      <h2 style="margin:0 0 6px 0">Welcome! Who are you?</h2>
+      <div class="muted">Enter your name to continue. You can still access Admin later (password required).</div>
+      <div class="grid" style="margin-top:12px">
+        <input id="gateName" placeholder="e.g., Damian" />
+        <div class="row" style="justify-content:flex-end;gap:8px">
+          <button class="secondary" id="gateCancel">Cancel</button>
+          <button id="gateSave">Continue →</button>
+        </div>
+      </div>
+      <div id="gateMsg" class="notice"></div>
+    </div>
+  </div>
+
+  <!-- Admin password overlay -->
+  <div id="adminGate" class="overlay" style="display:none">
+    <div class="sheet">
+      <h2 style="margin:0 0 6px 0">Admin access</h2>
+      <div class="muted">Enter password to manage quizzes.</div>
+      <div class="grid" style="margin-top:12px">
+        <input id="adminPass" type="password" placeholder="Password" />
+        <div class="row" style="justify-content:flex-end;gap:8px">
+          <button class="secondary" id="adminCancel">Cancel</button>
+          <button id="adminUnlock">Unlock</button>
+        </div>
+      </div>
+      <div id="adminMsg" class="notice err" style="display:none">Incorrect password.</div>
+    </div>
+  </div>
+
+  <script>
+    // ====== API endpoints (replace if needed) ======
+    const API = {
+      RETRIEVE: 'https://odgueg8sr4.execute-api.eu-central-1.amazonaws.com/v1/quiz',
+      UPSERT:   'https://odgueg8sr4.execute-api.eu-central-1.amazonaws.com/v1/quiz'
+    };
+
+    // ====== State ======
+    const PASS_PCT = 70;
+    let quizzes = [];
+    let currentQuizId = null; let questionCount = 10; let userName = '';
+    let QUIZ = []; let answers = []; let submitted=false; let currentIndex=0;
+
+    const elPlayer = document.getElementById('playerCard');
+    const elAdmin  = document.getElementById('adminCard');
+    const scorePill = document.getElementById('scorePill');
+
+    const tabPlayer = document.getElementById('tabPlayer');
+    const tabAdmin  = document.getElementById('tabAdmin');
+
+    // ====== Name/Admin gates ======
+    const nameGate = document.getElementById('nameGate');
+    const adminGate = document.getElementById('adminGate');
+
+    function ensureNameGate() {
+      userName = localStorage.getItem('quiz_name') || '';
+      if (!userName) { nameGate.style.display = 'flex'; }
+    }
+    function closeNameGate() { nameGate.style.display = 'none'; }
+
+    function askAdminPassword() {
+      adminGate.style.display = 'flex';
+      document.getElementById('adminPass').value = '';
+      document.getElementById('adminMsg').style.display = 'none';
+    }
+    function closeAdminGate() { adminGate.style.display = 'none'; }
+
+    document.getElementById('gateSave').onclick = ()=>{
+      const v = (document.getElementById('gateName').value||'').trim();
+      if (!v) { document.getElementById('gateMsg').textContent = 'Please enter a name.'; return; }
+      userName = v; localStorage.setItem('quiz_name', userName); closeNameGate(); renderPlayerWelcome();
+    };
+    document.getElementById('gateCancel').onclick = ()=>{ closeNameGate(); };
+
+    document.getElementById('adminUnlock').onclick = ()=>{
+      const v = (document.getElementById('adminPass').value||'');
+      if (v === 'koekie') { sessionStorage.setItem('admin_ok', '1'); closeAdminGate(); renderAdmin(true); activateTab('admin'); }
+      else { document.getElementById('adminMsg').style.display = 'block'; }
+    };
+    document.getElementById('adminCancel').onclick = ()=>{ closeAdminGate(); };
+
+    // ====== Tabs ======
+    function activateTab(which){
+      if(which==='player'){ elPlayer.style.display='block'; elAdmin.style.display='none'; tabPlayer.classList.add('active'); tabAdmin.classList.remove('active'); }
+      else { elPlayer.style.display='none'; elAdmin.style.display='block'; tabAdmin.classList.add('active'); tabPlayer.classList.remove('active'); }
+    }
+    tabPlayer.onclick = ()=>{ activateTab('player'); renderPlayerWelcome(); };
+    tabAdmin.onclick  = ()=>{
+      const ok = sessionStorage.getItem('admin_ok') === '1';
+      if (!ok) { askAdminPassword(); return; }
+      activateTab('admin'); renderAdmin();
+    };
+
+    // ====== Player ======
+    async function renderPlayerWelcome(){
+      scorePill.textContent = 'Score: —';
+      if (!localStorage.getItem('quiz_name')) { ensureNameGate(); return; }
+      userName = localStorage.getItem('quiz_name');
+      const qList = await fetchQuizList();
+      const quizOpts = qList.map(q=>`<option value="${q.quizId}">${escape(q.title||q.quizId)}</option>`).join('');
+      elPlayer.innerHTML = `
+        <h1>Take exam</h1>
+        <div class="quiz-controls">
+          <label> Name<br/><input id="pName" placeholder="e.g., Damian" value="${escape(userName)}"/></label>
+          <label> Quiz<br/>
+            <select id="pQuiz">${quizOpts}</select>
+          </label>
+          <label> Number of questions<br/>
+            <input id="pCount" type="number" min="1" max="60" value="10" />
+          </label>
+        </div>
+        <div class="row" style="justify-content:space-between;">
+          <div class="muted">Questions are randomized by the API.</div>
+          <div class="row" style="gap:8px">
+            <button class="secondary" id="changeName">Change name</button>
+            <button id="pStart">Start →</button>
+          </div>
+        </div>
+        <div id="pMsg" class="notice"></div>
+      `;
+
+      document.getElementById('changeName').onclick = ()=>{ nameGate.style.display = 'flex'; };
+
+      document.getElementById('pStart').onclick = async ()=>{
+        userName = (document.getElementById('pName').value||'').trim() || 'Guest';
+        localStorage.setItem('quiz_name', userName);
+        currentQuizId = (document.getElementById('pQuiz').value);
+        questionCount = Math.max(1, parseInt(document.getElementById('pCount').value||'10',10));
+        const msg = document.getElementById('pMsg'); msg.textContent='Loading questions…';
+        try{
+          const pack = await fetchRandomQuestions(currentQuizId, questionCount);
+          QUIZ = (pack.questions||[]).map(q=>({ id:q.qId, prompt:q.prompt, choices:q.choices, correct:q.correct||[], explanation:q.explanation||'' }));
+          if(QUIZ.length===0){ throw new Error('API returned zero questions'); }
+          answers = QUIZ.map(()=>new Set()); submitted=false; currentIndex=0; msg.textContent='';
+          renderQuestion(0);
+        }catch(e){ msg.classList.add('err'); msg.textContent = 'Failed to load from API; falling back to local demo data.'; setTimeout(()=>{msg.textContent='';},2500);
+          const arr = (LOCAL.bank[currentQuizId]||[]).slice(0, questionCount);
+          QUIZ = arr.map(q=>({ id:q.qId,prompt:q.prompt,choices:q.choices,correct:q.correct,explanation:q.explanation }));
+          answers = QUIZ.map(()=>new Set()); submitted=false; currentIndex=0; renderQuestion(0);
+        }
+      };
+    }
+
+    async function fetchQuizList(){
+      try{ const r = await fetch(API.RETRIEVE, { method:'GET' }); if(!r.ok) throw new Error('bad status'); quizzes = await r.json(); }
+      catch{ quizzes = LOCAL.quizzes; }
+      return quizzes;
+    }
+
+    async function fetchRandomQuestions(quizId, count){
+      const url = new URL(API.RETRIEVE);
+      url.searchParams.set('quizId', quizId);
+      url.searchParams.set('count', String(count));
+      const r = await fetch(url.toString(), { method:'GET' });
+      if(!r.ok) throw new Error('bad status');
+      return await r.json();
+    }
+
+    function renderQuestion(i){
+      const q = QUIZ[i];
+      const maxSel = Math.max(1, (q.correct||[]).length); // dynamic cap
+      const multi  = maxSel > 1;
+      const pct=Math.round((i/QUIZ.length)*100);
+      elPlayer.innerHTML = `
+        <div class="row"><div class="pill">Question ${i+1} / ${QUIZ.length}</div><div class="progress" style="flex:1"><div style="width:${pct}%"></div></div></div>
+        <h2>${escape(q.prompt)}</h2>
+        <div class="muted">${multi?`Select all that apply (max ${maxSel}).`:'Select exactly one answer.'}</div>
+        <form id="qForm" class="grid" style="margin-top:10px;gap:10px">${q.choices.map((c,idx)=>{
+          const type = multi? 'checkbox':'radio'; const checked = answers[i].has(idx)?'checked':'';
+          return `<label class="choice" style="display:grid;grid-template-columns:24px 1fr;gap:10px;align-items:start;background:#0e1420;border:1px solid var(--line);border-radius:12px;padding:12px">
+              <input type="${type}" name="opt" value="${idx}" ${checked} />
+              <div>${escape(c)}</div>
+          </label>`;}).join('')}</form>
+        <div class="row" style="justify-content:space-between;margin-top:12px">
+          <div class="row" style="gap:8px"><button class="secondary" id="backBtn" ${i===0?'disabled':''}>&larr; Back</button><button class="ghost" id="clearBtn" type="button">Clear</button></div>
+          <div>${i<QUIZ.length-1?`<button id="nextBtn">Next &rarr;</button>`:`<button id="submitBtn">Submit &rarr;</button>`}</div>
+        </div>`;
+
+      const form = document.getElementById('qForm');
+      form.onchange = (e)=>{
+        const t = e.target; if(!(t instanceof HTMLInputElement)) return; const idx = Number(t.value);
+        if(multi){
+          if(t.checked){ if(answers[i].size >= maxSel){ t.checked=false; return; } answers[i].add(idx); }
+          else { answers[i].delete(idx); }
+        } else { answers[i].clear(); if(t.checked) answers[i].add(idx); }
+      };
+      document.getElementById('clearBtn').onclick = ()=>{ answers[i].clear(); [...form.querySelectorAll('input')].forEach(x=>x.checked=false); };
+      const nb=document.getElementById('backBtn'); if(nb) nb.onclick = (ev)=>{ ev.preventDefault(); if(i>0) renderQuestion(i-1); };
+      const nx=document.getElementById('nextBtn'); if(nx) nx.onclick = (ev)=>{ ev.preventDefault(); if(answers[i].size===0) return; renderQuestion(i+1); };
+      const sb=document.getElementById('submitBtn'); if(sb) sb.onclick = (ev)=>{ ev.preventDefault(); renderResults(); };
+    }
+
+    function buildResultChips(q,have){ const want=new Set(q.correct||[]); const chips=[]; q.choices.forEach((text,idx)=>{ const sel=have.has(idx); const correct=want.has(idx); if(sel&&correct){ chips.push(`<div class='chip sel-ok'>✓&nbsp;${escape(text)}</div>`); } else if(sel&&!correct){ chips.push(`<div class='chip sel-bad'>✕&nbsp;${escape(text)}</div>`); } }); q.correct.forEach(idx=>{ if(!have.has(idx)){ chips.push(`<div class='chip missed-ok'>✓&nbsp;${escape(q.choices[idx])} <span style='opacity:.7'>&nbsp;(missed)</span></div>`); } }); return `<div class='picks'>${chips.join('')}</div>`; }
+
+    function renderResults(){
+      const res = QUIZ.map((q,i)=>{ const want=new Set(q.correct||[]); const have=answers[i]; const earned=[...have].filter(v=>want.has(v)).length; const max=want.size; return { q,i,have:[...have],earned,max }; });
+      const totals = res.reduce((a,r)=>({ earned:a.earned+r.earned, max:a.max+r.max }), {earned:0,max:0});
+      const pct = Math.round((totals.earned/Math.max(1,totals.max))*100); const passed=pct>=PASS_PCT;
+      scorePill.textContent = `Score: ${totals.earned} / ${totals.max} (${pct}%)`;
+      elPlayer.innerHTML = `
+        <h1>${passed?`Good job, ${escape(userName)} — you passed!`:`Tough break, ${escape(userName)} — not this time.`}</h1>
+        <div class="muted">Passing score is ${PASS_PCT}%. Your score: <strong>${totals.earned}/${totals.max}</strong> (${pct}%).</div>
+        <div class="results">${res.map(r=>{
+          const picksHTML = buildResultChips(r.q, new Set(r.have));
+          const ok = r.earned===r.max; return `<div class="result-item ${ok?'okItem':'badItem'}">
+            <div class="row" style="justify-content:space-between;align-items:baseline"><h3>Q${r.i+1}. ${escape(r.q.prompt)}</h3><span class="muted">Points: ${r.earned}/${r.max}</span></div>
+            ${picksHTML}
+            ${r.q.explanation?`<div class="notice" style="margin-top:8px">${escape(r.q.explanation)}</div>`:''}
+          </div>`; }).join('')}</div>
+        <div class="row" style="margin-top:16px;justify-content:space-between"><button class="secondary" id="againBtn">Back to start</button><span></span></div>`;
+      document.getElementById('againBtn').onclick = ()=>{ activateTab('player'); renderPlayerWelcome(); };
+    }
+
+    // ====== Admin ======
+    function renderAdmin(force=false){
+      const ok = sessionStorage.getItem('admin_ok') === '1';
+      if (!ok && !force) { askAdminPassword(); return; }
+      elAdmin.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h1>Admin</h1>
+          <div class="row" style="gap:8px">
+            <button class="ghost" id="lockAdmin">Lock</button>
+          </div>
+        </div>
+        <div class="grid cols-2">
+          <div>
+            <div class="section-title">Select or create</div>
+            <label> Quiz ID<br/><input id="aQuizId" placeholder="e.g., sap-c02" /></label>
+            <div class="row" style="margin-top:8px;gap:8px"><button id="btnLoad" class="secondary">Load current</button><button id="btnSave">Save / Upsert</button></div>
+            <div id="aMsg" class="notice"></div>
+          </div>
+          <div>
+            <div class="section-title">Questions JSON (array)</div>
+            <textarea id="aEditor" placeholder='[ {"qId":"q1","prompt":"...","choices":["A","B","C","D"],"correct":[1],"explanation":"..."} ]'></textarea>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:10px">API — GET ${escape(API.RETRIEVE)} | PUT ${escape(API.UPSERT)}</div>
+      `;
+
+      document.getElementById('lockAdmin').onclick = ()=>{ sessionStorage.removeItem('admin_ok'); activateTab('player'); };
+
+      document.getElementById('btnLoad').onclick = async ()=>{
+        const quizId=(document.getElementById('aQuizId').value||'').trim(); const msg=document.getElementById('aMsg');
+        if(!quizId){ msg.classList.add('err'); msg.textContent='Enter quizId.'; return; }
+        msg.textContent='Loading…';
+        try{
+          const url = new URL(API.RETRIEVE); url.searchParams.set('quizId',quizId); url.searchParams.set('admin','1');
+          const r = await fetch(url.toString(), { method:'GET' }); if(!r.ok) throw new Error('bad status'); const payload = await r.json();
+          const arr = payload.questions||[]; document.getElementById('aEditor').value = JSON.stringify(arr, null, 2); msg.textContent = arr.length?`Loaded ${arr.length} question(s).`:'No questions yet — new quiz.';
+        }catch(e){
+          const arr = LOCAL.bank[quizId] || []; document.getElementById('aEditor').value = JSON.stringify(arr, null, 2);
+          msg.textContent = 'API not reachable. Loaded local sample (if available).';
+        }
+      };
+
+      document.getElementById('btnSave').onclick = async ()=>{
+        const quizId=(document.getElementById('aQuizId').value||'').trim(); const msg=document.getElementById('aMsg');
+        if(!quizId){ msg.classList.add('err'); msg.textContent='Enter quizId.'; return; }
+        let arr=[]; try{ arr = JSON.parse(document.getElementById('aEditor').value||'[]'); if(!Array.isArray(arr)) throw new Error('not array'); }catch(e){ msg.classList.add('err'); msg.textContent='Editor content must be a JSON array.'; return; }
+        msg.textContent='Saving…';
+        try{
+          const r = await fetch(API.UPSERT, { method:'PUT', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ quizId, questions: arr }) });
+          if(!(r.status===204||r.ok)) throw new Error('save failed'); msg.textContent='Saved (upserted).';
+        }catch(e){ msg.classList.add('err'); msg.textContent='API not reachable. (Simulated save only)'; }
+      };
+    }
+
+    // ====== Local fallback data ======
+    const LOCAL = {
+      quizzes: [ { quizId:'sap-c02', title:'AWS SAP-C02 (demo)' } ],
+      bank: {
+        'sap-c02': [
+          { qId:'n1', prompt:'Share subnets centrally across accounts — choose two.', choices:['Transit Gateway','Enable org resource sharing','Peer VPCs with same CIDR','RAM resource share for subnets'], correct:[1,3], explanation:'Use RAM subnet sharing + org-level resource sharing.' },
+          { qId:'n2', prompt:'PHZ cross-account association — choose two.', choices:['/etc/resolv.conf','Auth in Account A','Associate VPC from Account B','Create PHZ in B'], correct:[1,2], explanation:'Authorization (A) then VPC association (B).' },
+          { qId:'s1', prompt:'EKS access to S3 without node creds?', choices:['Instance profile on nodes','IRSA','Static keys in Secret'], correct:[1], explanation:'IRSA.' }
+        ]
+      }
+    };
+
+    // ===== Utils =====
+    const escape = (s)=> String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+
+    // ===== Init =====
+    (async function(){
+      ensureNameGate();
+      if (!localStorage.getItem('quiz_name')) {
+        // show empty player until name filled
+        elPlayer.innerHTML = `<h1>Take exam</h1><div class="muted">Please enter your name to continue.</div>`;
+      } else {
+        renderPlayerWelcome();
+      }
+      // Admin tab can be opened later; no auto-render
+    })();
+  </script>
+</body>
+</html>
