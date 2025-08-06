@@ -61,11 +61,50 @@ data "aws_s3_bucket" "site" {
   bucket = aws_s3_bucket.site.bucket
 }
 
+# Optional custom domain and certificate
+resource "aws_route53_zone" "primary" {
+  count = var.domain_name == null ? 0 : 1
+  name  = var.domain_name
+}
+
+resource "aws_acm_certificate" "cert" {
+  count             = var.domain_name == null ? 0 : 1
+  domain_name       = var.domain_name
+  validation_method = "DNS"
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = var.domain_name == null ? {} : {
+    for dvo in aws_acm_certificate.cert[0].domain_validation_options :
+    dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  zone_id = aws_route53_zone.primary[0].zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.record]
+  ttl     = 60
+}
+
+resource "aws_acm_certificate_validation" "cert" {
+  count                   = var.domain_name == null ? 0 : 1
+  certificate_arn         = aws_acm_certificate.cert[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
 resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   comment             = "${var.project} static site"
   price_class         = var.cf_price_class
   default_root_object = "index.html"
+  aliases             = var.domain_name == null ? [] : [var.domain_name]
 
   origin {
     domain_name              = data.aws_s3_bucket.site.bucket_regional_domain_name
@@ -92,10 +131,56 @@ resource "aws_cloudfront_distribution" "cdn" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn            = var.domain_name == null ? null : aws_acm_certificate_validation.cert[0].certificate_arn
+    ssl_support_method             = var.domain_name == null ? null : "sni-only"
+    minimum_protocol_version       = var.domain_name == null ? null : "TLSv1.2_2021"
+    cloudfront_default_certificate = var.domain_name == null ? true : false
   }
 
   depends_on = [aws_s3_bucket_public_access_block.site]
+}
+
+# DNS records for the custom domain
+resource "aws_route53_record" "root" {
+  count  = var.domain_name == null ? 0 : 1
+  zone_id = aws_route53_zone.primary[0].zone_id
+  name    = var.domain_name
+  type    = "A"
+  alias {
+    name                   = aws_cloudfront_distribution.cdn.domain_name
+    zone_id                = aws_cloudfront_distribution.cdn.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "root_ipv6" {
+  count  = var.domain_name == null ? 0 : 1
+  zone_id = aws_route53_zone.primary[0].zone_id
+  name    = var.domain_name
+  type    = "AAAA"
+  alias {
+    name                   = aws_cloudfront_distribution.cdn.domain_name
+    zone_id                = aws_cloudfront_distribution.cdn.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53domains_registered_domain" "domain" {
+  count      = var.domain_name == null ? 0 : 1
+  domain_name = var.domain_name
+  name_server {
+    name = aws_route53_zone.primary[0].name_servers[0]
+  }
+  name_server {
+    name = aws_route53_zone.primary[0].name_servers[1]
+  }
+  name_server {
+    name = aws_route53_zone.primary[0].name_servers[2]
+  }
+  name_server {
+    name = aws_route53_zone.primary[0].name_servers[3]
+  }
+  tags = { Project = var.project }
 }
 
 resource "aws_s3_object" "site" {
