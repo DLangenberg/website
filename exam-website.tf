@@ -165,24 +165,6 @@ resource "aws_route53_record" "root_ipv6" {
   }
 }
 
-resource "aws_route53domains_registered_domain" "domain" {
-  count       = var.domain_name == null ? 0 : 1
-  domain_name = var.domain_name
-  name_server {
-    name = aws_route53_zone.primary[0].name_servers[0]
-  }
-  name_server {
-    name = aws_route53_zone.primary[0].name_servers[1]
-  }
-  name_server {
-    name = aws_route53_zone.primary[0].name_servers[2]
-  }
-  name_server {
-    name = aws_route53_zone.primary[0].name_servers[3]
-  }
-  tags = { Project = var.project }
-}
-
 resource "aws_s3_object" "site" {
   for_each = {
     for f in local.site_files :
