@@ -68,6 +68,7 @@ resource "aws_route53_zone" "primary" {
 }
 
 resource "aws_acm_certificate" "cert" {
+  provider          = aws.us
   count             = var.domain_name == null ? 0 : 1
   domain_name       = var.domain_name
   validation_method = "DNS"
